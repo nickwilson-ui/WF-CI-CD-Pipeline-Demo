@@ -1,0 +1,52 @@
+!!ExportedWorkflow
+apiVersion: torq.io/v2alpha
+kind: Workflow
+id: 25c255cd-98e3-4739-b785-78f308cba6fd
+name: Github
+trigger:
+  onDemandTrigger:
+    parameterList:
+      parameters: []
+playbook:
+  steps:
+    - name: us-docker.pkg.dev/stackpulse/public/github/create-github-jwt:1.1.0
+      id: create_github_jwt
+      env:
+        EXPIRATION_TIME: "600"
+        GITHUB_APP_CLIENT_ID: '{{ $.secrets.github_app_client_id }}'
+        GITHUB_APP_PRIVATE_KEY: '{{ $.secrets.github_signing_key }}'
+      uuid: cfd6a33a-6a10-4b05-8c31-500d89e52cb3
+      pretty_name: Create Github JWT
+      options: {}
+      documentationUrl: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app
+      manifestId: 565a25ba-4718-505c-aa91-1c90500c90c2
+      isPrivate: false
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/github/get-application-access-token:1.1.0
+      id: get_application_access_token
+      env:
+        GITHUB_API_URL: https://api.github.com
+        INSTALLATION: '{{ $.secrets.github_app_installation_id }}'
+        JWTTOKEN: '{{ $.create_github_jwt.output }}'
+      uuid: ba16b4ff-e63f-4beb-a07f-11cf4f02d0fc
+      pretty_name: Get Application Access Token
+      options:
+        executor:
+          name: http_request_v_4_30_0
+          env: {}
+          sync: true
+          disable: false
+      documentationUrl: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app
+      manifestId: cb6e8dfc-b017-55b9-8e36-2fd39c0da970
+      isPrivate: false
+      isPrivateUrl: true
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+  output_schema: '{}'
+  section: GitHub
+root: true
