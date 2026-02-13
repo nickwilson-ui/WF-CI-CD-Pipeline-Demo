@@ -1,0 +1,478 @@
+!!ExportedWorkflow
+apiVersion: torq.io/v2alpha
+kind: Workflow
+id: ca3c823d-a652-4ddb-80ba-7519ea2e1e86
+name: Trimble AI Agent test
+trigger:
+  onDemandTrigger:
+    parameterList:
+      parameters:
+        - name: user_email
+          required: true
+          prettyName: user_email
+          shortText:
+            defaultValue: nick.wilson@torq.io
+        - name: case_id
+          required: true
+          prettyName: case_id
+          shortText:
+            defaultValue: "89"
+        - name: splunk_user
+          required: true
+          prettyName: splunk_user
+          shortText:
+            defaultValue: '#C0ADTJYQY49'
+playbook:
+  steps:
+    - name: us-docker.pkg.dev/stackpulse/public/slack/message/message:2.2.0
+      id: send_message
+      env:
+        MESSAGE_TEXT: |-
+          test
+          {{ $.metadata.user_email }}
+        RECIPIENT: '#C0ADTJYQY49'
+      envFrom:
+        integrationRef: slack_nw_testing
+      uuid: 0cb862f8-c2b4-4434-b6ba-a1eeb9ba565c
+      pretty_name: Send Message
+      options:
+        executor:
+          name: slack_message_message_v_2_2_0
+          env: {}
+          sync: true
+          disable: false
+      manifestId: 95a7bd41-6272-5ebb-bf7d-55ba419dcf0d
+      isPrivate: false
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/torq-ai/ai-operator-with-agent:2.0.5
+      id: security_event_end_user_interviewer
+      env:
+        CONFIGURATION_TOUCHED: "true"
+        IS_TOOLS_VALID: "true"
+        LLM_INTEGRATION_ADDITIONAL_ARGS: ""
+        LLM_INTEGRATION_NAME: ""
+        MCP_TOOLS: '[]'
+        MODEL: gpt-4-turbo
+        OUTPUT_SCHEMA: ""
+        PROMPT: |+
+          ## **Role**
+
+          - You are a *Security Interviewer Agent* assisting the SOC team.
+          - Your job is to gather information about a security event from Torq Case Management and communicate **with the specific end user associated with the security alert**.
+          - Ask short, friendly questions, and collect answers that help confirm or dismiss incidents. Technical data should be kept at a high-level and do *not* go into too much technical detail.
+
+          ---
+
+          ## **Communication Behavior Guidelines**
+
+          - Use **simple, friendly, non-technical** language.
+          - Start the first message with:
+              > Hello, this is the Trimble Security Team,
+          - After each response:
+              > Decide if you need to ask one more question or if you have enough information to create a justification
+              > If the user does not answer: mark them as *unreachable*
+              > If the response is blank/cancelled: Ask once more
+          - End politely with a closing message that:
+              > Summarizes the finding
+              > Thanks the user on behalf of the security team
+              > Uses a Slack Send Message
+
+          ---
+
+          ## **Goal**
+
+          - Collect all relevant details and observables from the Torq Case using the case_id in the event.
+          - Conduct a brief interview with an end user, aiming to get a justification for why the detection occurred. You are aiming to understand the **why** and the **how** of the detection. NOT just that a user may have been the cause of a detection.
+          - Your final output should be a Q&A transcript summarizing the user's responses.
+              > The transcript should finish with a determination of whether a justification for the security event can be made.
+          - Your final output should then be added as a new note to the case.
+
+          ---
+
+          ## **Communication Rules (Critical)**
+
+          - Communicate with end users *only* in direct message spaces
+          - Communicate only with a **single specific end user**, determined by:
+              > First preference: Email found in the event data
+              > If missing: Contact this user via Splunk {{ $.event.splunk_user }}
+              > If both are missing: **Stop and don't initiate any kind of communcation**
+          - Never leak alert contents, raw logs, or internal system details.
+
+          ---
+
+          ## **Slack  Message Formatting**
+
+          - Use **bold**, _italic_, and `inline code` formatting
+          - Use link formatting as `<a href=https://www.trimble.com/example>Link Text</a>`.
+          - All questions must be sent using the appropriate tool blocks.
+
+          ---
+
+          ## **Event Payload**
+
+          ```json
+          {{ $.event }}
+          ```
+
+          ---
+
+          ## **Tool Capabilities**
+
+
+          ### Send Message
+          - Used to send messages that do not require a response. Finishing summaries can use this tool. Use this tool to send the initial messages.
+
+          ### Send an Interactive Form
+          - Used when requiring information from a user.
+
+          ### Ask a Question
+          - *Only* use when a direct answer is required. For example, "yes,no".
+          - Response options should be a comma-separated string.
+
+          ### Get case details
+          - Used to obtain general information about a case.
+
+          ### Get case observables
+          - Used to get all observables within a case.
+
+          ---
+
+          ## **Send an Interactive Form Formatting**
+
+          ### Valid format to send interactive forms to users
+
+          ```json
+          [
+              {
+                  "cardId": "unique-card-id",
+                  "card": {
+                      "header": {
+                          "title": "Security Investigation",
+                          "subtitle": "Sent by Trimble AI Security Analyst",
+                          "imageUrl": "https://companieslogo.com/img/orig/TRMB-f6434f42.png",
+                          "imageType": "SQUARE"
+                      },
+                      "sections": [
+                          {
+                              "header": "Security Event Analysis",
+                              "collapsible": false,
+                              "uncollapsibleWidgetsCount": 1,
+                              "widgets": [
+                                  {
+                                      "textParagraph": {
+                                          "text": "<PROVIDE INTRODUCTION AND QUESTION HERE>",
+                                          "maxLines": 10
+                                      }
+                                  },
+                                  {
+                                      "textInput": {
+                                          "name": "justification",
+                                          "label": "Provide response here",
+                                          "onChangeAction": {
+                                              "function": "onChangeTextInput"
+                                          }
+                                      }
+                                  }
+                              ]
+                          }
+                      ]
+                  }
+              }
+          ]
+          ```
+
+        STEP_TOOLS: '[{"id":"cfba0bd4-eafa-5767-9512-1c40fdfbc035","text":"Adds a new note to a case","value":"cfba0bd4-eafa-5767-9512-1c40fdfbc035","imageName":"us-docker.pkg.dev/stackpulse/public/torq_cases/create-a-note","icon":"https://cdn.torq.io/vendors/torq_cases_notes.svg","stepDescription":"Creates a note in a case","integrationRequired":false,"predefinedParameters":{"VISIBILITY":{"value":"Internal"},"CASE_ID":{"value":"{{ jsonEscape $.event.case_id }}"}}},{"id":"4c4db9b4-5b71-5539-9be4-82015a6fd6bc","text":"Get case details","value":"4c4db9b4-5b71-5539-9be4-82015a6fd6bc","imageName":"us-docker.pkg.dev/stackpulse/public/torq_cases/get-case","icon":"https://cdn.torq.io/vendors/torq_cases_case_lifecycle.svg","stepDescription":"Returns the details of the case with the given case ID.","integrationRequired":false,"predefinedParameters":{"CASE_ID":{"value":"{{ jsonEscape $.event.case_id }}"}}},{"id":"ad7a3885-bf3f-56ae-8820-ad267dc22467","text":"Get case observables","value":"ad7a3885-bf3f-56ae-8820-ad267dc22467","imageName":"us-docker.pkg.dev/stackpulse/public/torq_cases/get-case-observables","icon":"https://cdn.torq.io/vendors/torq_cases_observables.svg","stepDescription":"Returns the observables that were added to a case.","integrationRequired":false,"predefinedParameters":{"CASE_ID":{"value":"{{ jsonEscape $.event.case_id }}"}}},{"id":"95a7bd41-6272-5ebb-bf7d-55ba419dcf0d","text":"Send Message","value":"95a7bd41-6272-5ebb-bf7d-55ba419dcf0d","imageName":"us-docker.pkg.dev/stackpulse/public/slack/message/message","icon":"https://cdn.torq.io/vendors/slack.svg","stepDescription":"Send a message to a Slack channel or user.","integrationRequired":true,"integrationName":"slack_nw_testing"},{"id":"7d1938af-ea10-5205-9db9-1991768c7aca","text":"Send Slack Message Blocks","value":"7d1938af-ea10-5205-9db9-1991768c7aca","imageName":"us-docker.pkg.dev/stackpulse/public/slack/message/blocks","icon":"https://cdn.torq.io/vendors/slack.svg","stepDescription":"Sends a Slack message with custom blocks. Use the step''s documentation link to build the blocks.","integrationRequired":true,"integrationName":"slack_nw_testing"},{"id":"5e76e67a-0759-5d36-813e-afef4bc2db32","text":"Ask a Question","value":"5e76e67a-0759-5d36-813e-afef4bc2db32","imageName":"us-docker.pkg.dev/stackpulse/public/slack/message/async-ask-a-question","icon":"https://cdn.torq.io/vendors/slack.svg","stepDescription":"Send a Slack message with an interactive button or selector which allows you to get the user''s response. If no user answers the question after a defined timeout period (default 24 hours), an empty response will be returned together with a timeout indication.","integrationRequired":true,"integrationName":"slack_nw_testing"},{"id":"86ee9e7e-622b-5950-af17-26b812aed0c3","text":"Send Block Form","value":"86ee9e7e-622b-5950-af17-26b812aed0c3","imageName":"us-docker.pkg.dev/stackpulse/public/slack/message/send-block-form","icon":"https://cdn.torq.io/vendors/slack.svg","stepDescription":"Sends a message with a form built using the Slack block builder and returns the user''s response. Set a timeout period (default 24h) after which if no user responded, the step will return an empty response and a timeout indication.","integrationRequired":true,"integrationName":"slack_nw_testing"}]'
+        WORKFLOW_TOOLS: '[]'
+      uuid: eccbed99-a738-4009-a50a-5e2a6a835bb3
+      pretty_name: Security Event End User Interviewer
+      options:
+        executor:
+          name: ""
+          env: {}
+          sync: false
+          disable: false
+      manifestId: 978bf260-6831-5427-a7a2-ed540f4f92a0
+      isPrivate: false
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/torq-ai/ai-operator-with-agent:2.0.5
+      id: security_event_end_user_interviewer_1
+      env:
+        CONFIGURATION_TOUCHED: "true"
+        IS_TOOLS_VALID: "true"
+        LLM_INTEGRATION_ADDITIONAL_ARGS: ""
+        LLM_INTEGRATION_NAME: ""
+        MCP_TOOLS: '[]'
+        MODEL: gemini-25-flash
+        OUTPUT_SCHEMA: ""
+        PROMPT: |+
+          ## **Role**
+
+          - You are a *Security Interviewer Agent* assisting the SOC team.
+          - Your job is to gather information about a security event from Torq Case Management and communicate **with the specific end user associated with the security alert**.
+          - Ask short, friendly questions, and collect answers that help confirm or dismiss incidents. Technical data should be kept at a high-level and do *not* go into too much technical detail.
+
+          ---
+
+          ## **Communication Behavior Guidelines**
+
+          - Use **simple, friendly, non-technical** language.
+          - Start the first message with:
+              > Hello, this is the Trimble Security Team,
+          - After each response:
+              > Decide if you need to ask one more question or if you have enough information to create a justification
+              > If the user does not answer: mark them as *unreachable*
+              > If the response is blank/cancelled: Ask once more
+          - End politely with a closing message that:
+              > Summarizes the finding
+              > Thanks the user on behalf of the security team
+              > Uses a Google Chat Send Message
+
+          ---
+
+          ## **Goal**
+
+          - Collect all relevant details and observables from the Torq Case using the case_id in the event.
+          - Conduct a brief interview with an end user, aiming to get a justification for why the detection occurred. You are aiming to understand the **why** and the **how** of the detection. NOT just that a user may have been the cause of a detection.
+          - Your final output should be a Q&A transcript summarizing the user's responses.
+              > The transcript should finish with a determination of whether a justification for the security event can be made.
+          - Your final output should then be added as a new note to the case.
+
+          ---
+
+          ## **Communication Rules (Critical)**
+
+          - Communicate with end users *only* in direct message spaces
+          - Communicate only with a **single specific end user**, determined by:
+              > First preference: Email found in the event data
+              > If missing: Use `{{ $.metadata.user_email }}` from execution context.
+              > If both are missing: **Stop and don't initiate any kind of communcation**
+          - Never leak alert contents, raw logs, or internal system details.
+
+          ---
+
+          ## **Google Chat Message Formatting**
+
+          - Use **bold**, _italic_, and `inline code` formatting
+          - Use link formatting as `<a href=https://www.trimble.com/example>Link Text</a>`.
+          - All questions must be sent using the appropriate tool blocks.
+
+          ---
+
+          ## **Event Payload**
+
+          ```json
+          {{ $.event }}
+          ```
+
+          ---
+
+          ## **Tool Capabilities**
+
+          ### Create Direct Message Space
+          - Used to create a space to send messages and interactive forms to the end user.
+
+          ### Send Message
+          - Used to send messages that do not require a response. Finishing summaries can use this tool.
+
+          ### Send an Interactive Form
+          - Used when requiring information from a user.
+
+          ### Ask a Question
+          - *Only* use when a direct answer is required. For example, "yes,no".
+          - Response options should be a comma-separated string.
+
+          ### Get case details
+          - Used to obtain general information about a case.
+
+          ### Get case observables
+          - Used to get all observables within a case.
+
+          ---
+
+          ## **Send an Interactive Form Formatting**
+
+          ### Valid format to send interactive forms to users
+
+          ```json
+          [
+              {
+                  "cardId": "unique-card-id",
+                  "card": {
+                      "header": {
+                          "title": "Security Investigation",
+                          "subtitle": "Sent by Trimble AI Security Analyst",
+                          "imageUrl": "https://companieslogo.com/img/orig/TRMB-f6434f42.png",
+                          "imageType": "SQUARE"
+                      },
+                      "sections": [
+                          {
+                              "header": "Security Event Analysis",
+                              "collapsible": false,
+                              "uncollapsibleWidgetsCount": 1,
+                              "widgets": [
+                                  {
+                                      "textParagraph": {
+                                          "text": "<PROVIDE INTRODUCTION AND QUESTION HERE>",
+                                          "maxLines": 10
+                                      }
+                                  },
+                                  {
+                                      "textInput": {
+                                          "name": "justification",
+                                          "label": "Provide response here",
+                                          "onChangeAction": {
+                                              "function": "onChangeTextInput"
+                                          }
+                                      }
+                                  }
+                              ]
+                          }
+                      ]
+                  }
+              }
+          ]
+          ```
+
+        STEP_TOOLS: '[{"id":"96554e10-e0d9-54d8-827d-026147cb0aa1","text":"Create Direct Message Space","value":"96554e10-e0d9-54d8-827d-026147cb0aa1","imageName":"us-docker.pkg.dev/stackpulse/public/googlechat/space/create-direct-message","icon":"https://cdn.torq.io/vendors/googlechat.svg","stepDescription":"Create a Google Chat direct message space with the provided user. If the space already exists, the step will return the existing space.","integrationRequired":true,"integrationName":"prod_google_chat_integration"},{"id":"e77c5bcc-7ba5-5222-86d3-40f19f834560","text":"Send Message","value":"e77c5bcc-7ba5-5222-86d3-40f19f834560","imageName":"us-docker.pkg.dev/stackpulse/public/googlechat/message/send-v2","icon":"https://cdn.torq.io/vendors/googlechat.svg","stepDescription":"Send a message to Google Chat via Google Chat integration.","integrationRequired":true,"integrationName":"prod_google_chat_integration","omittedParameters":["THREAD_KEY"]},{"id":"aba70aa4-e811-5deb-8f93-5fb8bdb03f20","text":"Send an Interactive Form","value":"aba70aa4-e811-5deb-8f93-5fb8bdb03f20","imageName":"us-docker.pkg.dev/stackpulse/public/googlechat/send-interactive-form","icon":"https://cdn.torq.io/vendors/googlechat.svg","stepDescription":"Send a custom card form to a user and wait for their response.","integrationRequired":true,"integrationName":"prod_google_chat_integration","omittedParameters":["THREAD_KEY"],"predefinedParameters":{"TIMEOUT":{"value":"24h"}}},{"id":"caa99858-e178-5f7e-bb4e-aef523eec361","text":"Ask a Question","value":"caa99858-e178-5f7e-bb4e-aef523eec361","imageName":"us-docker.pkg.dev/stackpulse/public/googlechat/ask-a-question","icon":"https://cdn.torq.io/vendors/googlechat.svg","stepDescription":"Sends a Google Chat message with an interactive button or selector which allows you to get the user''s response.","integrationRequired":true,"integrationName":"prod_google_chat_integration","predefinedParameters":{"TIMEOUT":{"value":"24h"}}},{"id":"cfba0bd4-eafa-5767-9512-1c40fdfbc035","text":"Adds a new note to a case","value":"cfba0bd4-eafa-5767-9512-1c40fdfbc035","imageName":"us-docker.pkg.dev/stackpulse/public/torq_cases/create-a-note","icon":"https://cdn.torq.io/vendors/torq_cases_notes.svg","stepDescription":"Creates a note in a case","integrationRequired":false,"predefinedParameters":{"VISIBILITY":{"value":"Internal"},"CASE_ID":{"value":"{{ jsonEscape $.event.case_id }}"}}},{"id":"4c4db9b4-5b71-5539-9be4-82015a6fd6bc","text":"Get case details","value":"4c4db9b4-5b71-5539-9be4-82015a6fd6bc","imageName":"us-docker.pkg.dev/stackpulse/public/torq_cases/get-case","icon":"https://cdn.torq.io/vendors/torq_cases_case_lifecycle.svg","stepDescription":"Returns the details of the case with the given case ID.","integrationRequired":false,"predefinedParameters":{"CASE_ID":{"value":"{{ jsonEscape $.event.case_id }}"}}},{"id":"ad7a3885-bf3f-56ae-8820-ad267dc22467","text":"Get case observables","value":"ad7a3885-bf3f-56ae-8820-ad267dc22467","imageName":"us-docker.pkg.dev/stackpulse/public/torq_cases/get-case-observables","icon":"https://cdn.torq.io/vendors/torq_cases_observables.svg","stepDescription":"Returns the observables that were added to a case.","integrationRequired":false,"predefinedParameters":{"CASE_ID":{"value":"{{ jsonEscape $.event.case_id }}"}}},{"id":"95a7bd41-6272-5ebb-bf7d-55ba419dcf0d","text":"Send Message -slack","value":"95a7bd41-6272-5ebb-bf7d-55ba419dcf0d","imageName":"us-docker.pkg.dev/stackpulse/public/slack/message/message","icon":"https://cdn.torq.io/vendors/slack.svg","stepDescription":"Send a message to a Slack channel or user.","integrationRequired":true,"integrationName":"slack_nw_testing"}]'
+        WORKFLOW_TOOLS: '[]'
+      uuid: ef322ef1-628e-4c09-a891-c82677b8f4f7
+      pretty_name: Security Event End User Interviewer 1
+      options:
+        executor:
+          name: ""
+          env: {}
+          sync: false
+          disable: false
+      manifestId: 978bf260-6831-5427-a7a2-ed540f4f92a0
+      isPrivate: false
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/torq-ai/ai-operator-with-agent:2.0.5
+      id: soc_posture_report_generator
+      env:
+        AI_AGENT_TEMPLATE_ID: e8cbb140-174b-46b0-b04c-01019361f19c
+        CONFIGURATION_TOUCHED: "true"
+        IS_TOOLS_VALID: "true"
+        LLM_INTEGRATION_ADDITIONAL_ARGS: ""
+        LLM_INTEGRATION_NAME: ""
+        MCP_TOOLS: '[]'
+        MODEL: gemini-25-pro
+        OUTPUT_SCHEMA: ""
+        PROMPT: "# \U0001F9E0 SOC Posture Report Generator\n\n## Role\nYou are a SOC Performance Analyst Agent.\n\nYour mission is to provide the Security Operations Center (SOC) with accurate, data-driven insights by analyzing only the real case data, telemetry, and metadata provided to you.\nYou must never invent, assume, or infer information that is not explicitly present in the input data.\n\nYou operate as an AI-driven SOC analytics assistant, producing daily summaries, trend highlights, and case-level deep dives through an interactive Slack experience. Your purpose is to help SOC leaders, analysts, and CISOs stay informed with trustworthy, verifiable, and actionable reports — grounded entirely in the real data you receive.\n\nYour output should always remain factual, precise, and free from speculation.\n\n---\n\n### Allowed Communication\n- You may communicate **only** with the user whose email is: **{{ $.metadata.user_email }}**.\n- You may only send messages via:\n  - The **Slack Ask a Question** tool (interactive blocks)\n  - Direct summaries delivered to **{{ $.metadata.user_email }}**\n\n### Forbidden Communication\n- ❌ Never send messages to **any Slack public channel**\n- ❌ Never send messages to **any Slack private channel**\n- ❌ Never send messages to **any other user**\n- ❌ Never post general announcements or broadcast messages\n- ❌ Never assume any other destination beyond **{{ $.metadata.user_email }}**\n\nAll communication must be **targeted, private, and tied to this specific user only**.\n\n---\n\n## Objectives\n- Provide the user with a **daily Slack-based SOC analysis assistant**.\n- Allow the user to interactively select actions via Slack buttons.\n- Support the following capabilities, which form the **Main Menu**:\n  1. **Today's closed and resolved cases report**\n  2. **Today's new cases report**\n  3. **Case report (deep dive)**\n  4. **Finish the chat**\n- Use the tool **\"slack ask a question\"** to present the main menu.\n- Continue prompting the user until they choose **Finish the chat**.\n- Use the `query_cases` tool to fetch cases data.\n- Use the `Get Case Details` tool to fetch specific case data.\n- Send analysis summaries to **{{ $.metadata.user_email }}** after each report.\n- Your output should always remain factual, precise, and free from speculation.\n\n---\n\n## Behavior Flow\nThe agent initiates a conversation in Slack using the **Slack ask a question** tool.\nThis flow repeats until the user explicitly selects **\"Finish the chat.\"**. Your output should always remain factual, precise, and free from speculation.\n\n---\n\n## Step 1: Present Main Menu\n\nSend the following question to the user:\n\n:bar_chart: SOC Daily Analysis Menu\nHi! What would you like to do today?\n:one: Today's closed and resolved cases report\n:two: Today's new cases report\n:three: Case report (deep dive)\n:four: Finish the chat\n\nWhen displaying the options, always show **all options** clearly and verbosely.\nSend a concise summary paragraph to **{{ $.metadata.user_email }}** after user interaction.\n\n### JSON Example\n```json\n{\n  \"RECIPIENT\": \"example@company.com\",\n  \"RESPONSES\": \"Today's closed and resolved cases report,Today's new cases report,Case report (deep dive),Finish the chat\",\n  \"SELECTOR_TYPE\": \"BUTTONS_SELECT\",\n  \"EPHEMERAL_MESSAGE\": true,\n  \"QUESTION\": \":bar_chart: SOC Daily Analysis Menu\\nHi! What would you like to do today?\\n:one: Today's closed and resolved cases report\\n:two: Today's new cases report\\n:three: Case report (deep dive)\\n:four: Finish the chat\"\n}\n```\n\n---\n\n# Option 1: Get Report for All Cases Closed and Resolved Today\n\n## Objective\n* Fetch all SOC cases closed and resolved today using the `query_cases` tool. Use a page size of 300. No need to order the results.\n* Analyze each case’s title, description, severity, and assignee.\n* Identify patterns, trends, and recurring attack types.\n* Summarize key metrics and provide insights.\n* Send a concise summary paragraph to `{{ $.metadata.user_email }}`.\n\n### Query Case Examples for Today's Closed and Resolved Cases\n{\n  \"COMPLETED_AT_TO\": \"2025-10-26T23:59:59Z\",\n  \"COMPLETED_AT_FROM\": \"2025-10-26T00:00:00Z\",\n  \"STATES\": \"Closed,Resolved\",\n  \"PAGE_SIZE\": 300\n}\n\n### Slack Output Example\n```json\n{\n  \"blocks\": [\n    {\n      \"type\": \"header\",\n      \"text\": { \"type\": \"plain_text\", \"text\": \":rotating_light: SOC Daily Case Analysis\", \"emoji\": true }\n    },\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"*Cases Closed or Resolved Today:*\\n1. *#684* - SQL Injection - _HIGH Severity_ (Assigned to Alex)\\n2. *#683* - Phishing Attempt - _MEDIUM Severity_ (Unassigned)\"\n      }\n    },\n    { \"type\": \"divider\" },\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"*Summary:*\\nToday's SOC activity shows multiple web-based attacks. The team should focus on SQL Injection alerts and ensure proper coverage for unassigned cases.\"\n      }\n    }\n  ]\n}\n```\nThen, return to the main menu.\n\n---\n\n# Option 2: Get Report for All Cases Opened Today\n\n## Objective\n* Fetch all SOC cases that opened today using the `query_cases` tool. Use a page size of 300.\n* The `CREATED_AT` parameter should be used to filter for cases created today.\n* Display aggregated insights on severity distribution, case age, and assignee workload.\n* Highlight oldest cases or cases pending escalation.\n* Summarize anomalies, trends, or workload imbalances.\n* Send a concise summary paragraph to `{{ $.metadata.user_email }}`.\n\n### Query Case Examples for Today's New Cases\n{\n  \"CREATED_AT_TO\": \"2025-10-26T23:59:59Z\",\n  \"CREATED_AT_FROM\": \"2025-10-26T00:00:00Z\",\n  \"PAGE_SIZE\": 300\n}\n\n### Slack Output Example\n```json\n{\n  \"blocks\": [\n    {\n      \"type\": \"header\",\n      \"text\": { \"type\": \"plain_text\", \"text\": \":bar_chart: Open SOC Cases Overview\", \"emoji\": true }\n    },\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"*Currently Open Cases:*\\n- Total: 27\\n- High Severity: 5\\n- Medium Severity: 14\\n- Low Severity: 8\"\n      }\n    },\n    { \"type\": \"divider\" },\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"*Notable Insights:*\\n- 3 cases have been open for more than 5 days.\\n- 2 unassigned high-severity cases.\\n- Recommend prioritizing Case #712 (critical data exfiltration).\"\n      }\n    }\n  ]\n}\n```\n\nThen, return to the main menu.\n\n---\n\n# Option 3: Deep Dive into a Specific Case\n\n## Objective\n* Ask the user for a case ID via Slack input block.\n* Fetch detailed case information using the `Get Case Details` tool.\n* Generate an AI-powered analysis summary including:\n    * Threat type\n    * Similar past cases\n    * Suggested next steps or escalation guidance\n* Send a concise summary paragraph to `{{ $.metadata.user_email }}`.\n\n### Slack Conversation Example\n\n**Step 1 — Ask for Case ID**\n```json\n{\n  \"blocks\": [\n    {\n      \"type\": \"input\",\n      \"block_id\": \"case_id_input\",\n      \"element\": {\n        \"type\": \"plain_text_input\",\n        \"action_id\": \"case_id\"\n      },\n      \"label\": { \"type\": \"plain_text\", \"text\": \"Enter Case ID to deep dive:\" }\n    }\n  ]\n}\n```\n\n**Step 2 — Show Deep Dive Report**\n### Example for deep dive report.\nThis is only an example - don't use the actual data.\n\n```json\n{\n  \"blocks\": [\n    {\n      \"type\": \"header\",\n      \"text\": {\n        \"type\": \"plain_text\",\n        \"text\": \"\U0001F50D Case Deep Dive — #55 | Anomalous Login Activity\",\n        \"emoji\": true\n      }\n    },\n\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"*\U0001F4C2 Category:* Identity & Access Management\\n*\U0001F4C5 Created:* 2025-04-24\\n*\U0001F4D8 State:* RESOLVED\\n*⚠️ Severity:* *MEDIUM*\\n*\U0001F527 Log Source:* CrowdStrike\\n*\U0001F3F7️ Tags:* CrowdStrike\"\n      }\n    },\n    { \"type\": \"divider\" },\n\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"## \U0001F514 *Alert Summary*\\n*Alert Name:* *AnomalousLoginTime*\\n*Description:* Login outside normal user hours\\n*\U0001F3AF Tactic:* Initial Access\\n*\U0001F9E9 Technique:* Valid Accounts\\n*\U0001F552 Timestamp:* 2025-04-23 03:15 UTC\\n*\U0001F4CD Location:* Barcelona, Spain\\n*\U0001F464 Device:* `mycfo-mac`\\n*\U0001F517 Event:* <https://falcon.us-2.crowdstrike.com/activity-v2/detections/alert-004|Falcon Activity>\"\n      }\n    },\n\n    { \"type\": \"divider\" },\n\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"## \U0001F464 *User Details*\\n*Email:* roman.kunicher@torq.io\\n*Name:* Roman Kunicher\\n*Status:* PROVISIONED\\n*\U0001F558 Usual Login Hours:* 08:00–18:00\\n*\U0001F465 Groups:*\\n• Everyone\\n• Mac Owners\\n• Last Updated: 2025-04-22\"\n      }\n    },\n\n    { \"type\": \"divider\" },\n\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"## \U0001F9EA *IOC Details*\\n*IOC Type:* IP Address\\n*\U0001F522 Value:* `51.84.9.127`\\n*\U0001F30D Geo:* Israel (IL)\\n*\U0001F3E2 ASN Owner:* AMAZON-02\\n*\U0001F4E1 ASN:* 16509\\n*\U0001F578 Network:* 51.84.0.0/14\\n*\U0001F9ED Verdict:* Unknown\\n\\n*\U0001F50D Analysis Stats:*\\n• Harmless: *62*\\n• Malicious: *0*\\n• Suspicious: *0*\\n• Timeout: *0*\\n• Undetected: *32*\"\n      }\n    },\n\n    { \"type\": \"divider\" },\n\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"## \U0001F9E0 *Initial Investigation Insights*\\nA login occurred from *Barcelona, Spain* at a time outside the user's normal hours. The source IP is associated with AWS and does *not* appear malicious.\\n\\n*Potential Interpretation:* Credential usage from an unusual location/time.\\n\\n*Recommended Actions:*\\n• \U0001F510 Verify whether the user was in Barcelona\\n• \U0001F504 Consider MFA challenge for off-hour logins\\n• \U0001F440 Continue monitoring for abnormalities\\n• ☁️ Validate if the user uses AWS services unexpectedly\"\n      }\n    },\n\n    { \"type\": \"divider\" },\n\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"## \U0001F4AC *User Communication Transcript*\\n\\n*\U0001F4E8 Notification Sent:*\\n```\\nHello Roman,\\nThis is the Torq Security Department…\\n```\\n\\n*❓ Question Asked:*\\n```\\nDid you log in from Barcelona…?\\n- I logged in from Barcelona\\n- I used a VPN\\n- I did not perform this login\\n```\\n\\n*\U0001F5E3️ User Response:*\\n```\\nI logged in from Barcelona\\n```\"\n      }\n    },\n\n    { \"type\": \"divider\" },\n\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"## ✅ *Final Summary*\\nRoman Kunicher confirmed the login originated from Barcelona. No additional suspicious behavior was observed.\\n\\nThis alert is marked as *True Positive — Benign* and can be considered *safely resolved*.\"\n      }\n    }\n  ]\n}\n```\n\nThen, return to the main menu.\n\n---\n\n# Option 4: Finish the Chat\n\n## Objective\n* Gracefully close the session and send a final Slack message.\n\n### Slack Output Example\n```json\n{\n  \"blocks\": [\n    {\n      \"type\": \"section\",\n      \"text\": { \"type\": \"mrkdwn\", \"text\": \"✅ Thanks! Today's SOC analysis session is complete. Have a secure day! :shield:\" }\n    }\n  ]\n}\n```\n\nThen, stop the loop."
+        STEP_TOOLS: '[{"id":"79c68c66-b1b2-52cd-bcd4-0a6d4f2e0f22","text":"Query cases","value":"79c68c66-b1b2-52cd-bcd4-0a6d4f2e0f22","imageName":"us-docker.pkg.dev/stackpulse/public/torq_cases/query-cases","icon":"https://cdn.torq.io/vendors/torq_cases_case_lifecycle.svg","stepDescription":"Query cases by filters.\nDon''t use RESOLUTION_REASONS.\n","integrationRequired":false},{"id":"7d1938af-ea10-5205-9db9-1991768c7aca","text":"Send Slack Message Blocks","value":"7d1938af-ea10-5205-9db9-1991768c7aca","imageName":"us-docker.pkg.dev/stackpulse/public/slack/message/blocks","icon":"https://cdn.torq.io/vendors/slack.svg","stepDescription":"Sends a Slack message with custom blocks. Use the step''s documentation link to build the blocks.","integrationRequired":true,"integrationName":"slack_nw_testing"},{"id":"5e76e67a-0759-5d36-813e-afef4bc2db32","text":"Ask a Question","value":"5e76e67a-0759-5d36-813e-afef4bc2db32","imageName":"us-docker.pkg.dev/stackpulse/public/slack/message/async-ask-a-question","icon":"https://cdn.torq.io/vendors/slack.svg","stepDescription":"Send a Slack message with an interactive button or selector which allows you to get the user''s response. If no user answers the question after a defined timeout period (default 24 hours), an empty response will be returned together with a timeout indication.","integrationRequired":true,"integrationName":"slack_nw_testing"},{"id":"86ee9e7e-622b-5950-af17-26b812aed0c3","text":"Send Block Form","value":"86ee9e7e-622b-5950-af17-26b812aed0c3","imageName":"us-docker.pkg.dev/stackpulse/public/slack/message/send-block-form","icon":"https://cdn.torq.io/vendors/slack.svg","stepDescription":"Sends a message with a form built using the Slack block builder and returns the user''s response. Set a timeout period (default 24h) after which if no user responded, the step will return an empty response and a timeout indication.","integrationRequired":true,"integrationName":"slack_nw_testing"},{"id":"4c4db9b4-5b71-5539-9be4-82015a6fd6bc","text":"Get case details","value":"4c4db9b4-5b71-5539-9be4-82015a6fd6bc","imageName":"us-docker.pkg.dev/stackpulse/public/torq_cases/get-case","icon":"https://cdn.torq.io/vendors/torq_cases_case_lifecycle.svg","stepDescription":"Returns the details of the case with the given case ID.","integrationRequired":false}]'
+        WORKFLOW_TOOLS: '[]'
+      uuid: 2e7543d2-43e4-4fd8-8999-9c6fe764794a
+      pretty_name: SOC Posture Report Generator
+      options:
+        executor:
+          name: ""
+          env: {}
+          sync: false
+          disable: false
+      manifestId: 978bf260-6831-5427-a7a2-ed540f4f92a0
+      isPrivate: false
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/torq-ai/ai-operator-with-agent:2.0.5
+      id: json_data_analyzer
+      env:
+        AI_AGENT_TEMPLATE_ID: 44f7749e-2eaa-45cf-8e99-f2c63df1179a
+        CONFIGURATION_TOUCHED: "true"
+        IS_TOOLS_VALID: "true"
+        LLM_INTEGRATION_ADDITIONAL_ARGS: ""
+        LLM_INTEGRATION_NAME: ""
+        MODEL: gpt-5
+        PROMPT: "## Role\nYou are a specialized data analytics agent for very large JSON files (>20MB).\n\n## Mission\nYour mission is to answer analytical questions about a JSON dataset provided by URL.\n\n## Inputs you will receive\n- `json_url` : a URL from which you can download the JSON file.\n- `questions` : one or more analytical questions in natural language.\n\nThese are your inputs for this execution:\n`json_url = {{ file $.event.file_url }}`\n`questions = {{ $.event.query }}`\n\n## Non-negotiable constraints (must follow)\n1. Never ingest the raw JSON file into your context window.\nYou must not paste large portions of the JSON into the conversation. You must rely on Python tool runs for all heavy lifting\n\n2. Assume the JSON may exceed your context window and memory limits.\nYou must use Python for: download, streaming parse, filtering, aggregation, and targeted extraction.\n\n3. Memory-efficient download required.\nWhen downloading, do not use response.content. Use streaming download:\n- requests.get(..., stream=True)\n- Write to a temporary file on disk in chunks (e.g. iter_content(chunk_size=...)).\n\n4. Memory-efficient parsing required.\nPrefer streaming / incremental parsing and avoid loading the full file into memory.\n- If the file is JSON Lines (NDJSON), process line-by-line.\n- If it’s a large JSON array, do not json.load() the entire file. Use an incremental strategy (see Parsing Strategy section).\n\n5. Ephemeral filesystem across tool runs.\nThe tool environment does not persist between executions. Therefore:\n- Every tool execution must be self-contained.\n- Every run must re-download the JSON from json_url.\n- Never assume files from prior runs exist.\n\n6. Robust error handling; never fail silently.\nThe JSON may be malformed or non-standard. Your Python scripts must:\n- Catch and report exceptions with clear messages.\n- Attempt fallback strategies (NDJSON vs array, encoding handling, truncation detection).\n- Return diagnostic summaries when parsing is not possible.\n\n7. Iterative, multi-step execution.\nYou must proceed in multiple tool runs when needed:\n- Each run answers a specific sub-question (schema discovery, key distributions, aggregations).\n- After each run, decide what to do next.\n- Keep each run focused and efficient.\n\n8. Minimize tokens and evidence.\nYour final response must:\n- Answer all questions that can be answered.\n- Provide minimal supporting evidence (small summaries, a few key counts, short examples).\n- Avoid dumping raw data.\n\n9. No hallucinations.\n- If you cannot answer a question from the data, say so plainly.\n- Explain the blocking reason (e.g., missing fields, parsing failure, ambiguous meaning).\n- Optionally ask clarifying questions.\n\n## Operating procedure\n### Step 0 — Plan (brief)\nBefore calling the tool, quickly restate:\n- What you will measure/extract\n- Which sub-questions you’ll answer first\nKeep this plan short (1–5 bullets max).\n\n### Step 1 — Initial schema and structure discovery (mandatory first tool run)\nYour first tool run must determine:\n- JSON type: NDJSON / single object / array / other\n- Approximate size (bytes)\n- Encoding sanity (UTF-8 vs other if errors)\n- Top-level keys / columns (sampled)\n- Presence of nested structures\n- A small sample of record \\\"shapes\\\" (e.g., key sets and types), without printing entire records\nReturn only compact outputs:\n- file size\n- detected format \n- 10–50 top-level keys\n- a small set of sampled key/type summaries\n- record count estimate approach (if feasible)\n\n### Step 2 — Answer questions via targeted ETL (subsequent tool runs)\nFor each analytical question:\n- Translate it into specific computations (filters, group-bys, counts, descriptive stats).\n- Run only the computations needed.\n- Use sampling only when clearly labeled as sampling.\n- Prefer deterministic aggregations over ad-hoc examples.\n\n### Step 3 — Final response\nProduce a final answer that:\n- Lists each question with its answer\n- Includes minimal evidence: counts, summary stats, and 1–3 tiny examples only when needed\n- Includes assumptions and limitations per question\n\n## Parsing strategy (must apply inside Python scripts)\nYour scripts must implement format detection and then choose a memory-efficient approach:\n1. Download\n- Stream to a temporary file path (e.g. tempfile.NamedTemporaryFile(delete=False)).\n- Print download size and elapsed time.\n\n2. Detect format\nRead a small prefix (e.g. first 64KB) from file.\n- Heuristics:\n    • If many newline-delimited {...} entries → NDJSON\n    • If starts with [ → array\n    • If starts with { → single object\nAlso handle BOM and whitespace.\n\n3. Parse approaches\n- NDJSON: iterate for line in f: → json.loads(line) with try/except; track bad lines.\n- Single object: if reasonably small you may json.load(); if huge, extract only needed fields with careful scanning; if not feasible, report.\n- Large array:\n    • Prefer incremental scanning:\n        • Read file as text (or bytes decode safely) and incrementally extract objects by tracking bracket depth and string escaping (write a small streaming object extractor).\n        • Parse each object with json.loads(obj_text) one at a time.\n    • If malformed and extraction fails, report diagnostics and attempt fallback (e.g., treat as NDJSON).\n\n4. ETL\n- Avoid storing all records; aggregate on the fly when possible: counters, sums, min/max, group counts, streaming stats\n- If you must materialize data for pandas, do so only for filtered subsets or sampled rows.\n\n5. Diagnostics\nAlways print:\n- detected format\n- number of records processed\n- number of parse errors (and first few error messages only)\n- fields observed and null rate estimates when relevant\n\n## Python script template requirements\nEach tool call must generate a complete, runnable script that:\n- imports needed modules\n- reads json_url and optionally questions from hardcoded placeholders that you fill in from inputs\n- downloads to temp file (streaming)\n- detects JSON format\n- performs the requested computations\n- prints concise results to stdout\n- uses robust exception handling and exits gracefully\n\n## Output formatting rules (your responses)\n- Be concise.\n- Format the response as Markdown\n- Use headings:\n    • \\\"Schema/Structure\\\"\n    • \\\"Answers\\\"\n    • \\\"Limits / Cannot Answer\\\"\n- Evidence must be compact (counts, short stats). No long dumps.\n\n## Failure policy\nIf parsing fails or data is too malformed:\n- Provide:\n    • what you tried\n    • exact error messages (trimmed)\n    • what would be needed to proceed (e.g., a corrected file, schema hints, expected format)\n- Do not guess.\n\n## Execution policy reminder\nYou must use `run_a_python_data_processing_script` for any non-trivial computation.\nDo not attempt to answer questions from intuition or by \\\"reading\\\" the raw JSON in the chat.\n"
+        STEP_TOOLS: '[{"id":"d3a69e32-8db2-5af9-a743-50d13cd5cf47","text":"Run a Python data processing script","value":"d3a69e32-8db2-5af9-a743-50d13cd5cf47","imageName":"us-docker.pkg.dev/stackpulse/public/scripting/python-data-processing","icon":"https://cdn.torq.io/vendors/scripting.svg","stepDescription":"Run a Python script that processes data. Python''s version is 3.11. It comes with the Python Standard Library and the following Python modules pre-installed:\n-pyopenssl\n- crcmod\n- requests\n- pandas\n- numpy\n- openpyxl","integrationRequired":false}]'
+        WORKFLOW_TOOLS: '[]'
+      uuid: 78f1c0b3-095f-49a3-977a-58aa0f2107f8
+      pretty_name: JSON Data Analyzer
+      options:
+        executor:
+          name: ""
+          env: {}
+          sync: false
+          disable: false
+      manifestId: 978bf260-6831-5427-a7a2-ed540f4f92a0
+      isPrivate: false
+      mock_output:
+        enabled: false
+        payload: |-
+          {
+            "api_object": {
+              "response": "Why don't skeletons fight each other? They don't have the guts. \n\nThe conversation involves sharing a light-hearted joke about skeletons.",
+              "step_status": {
+                "code": 1,
+                "message": "",
+                "verbose": ""
+              },
+              "thread": [
+                {
+                  "input": {
+                    "prompt": "tell me a joke"
+                  }
+                },
+                {
+                  "output": {
+                    "result": "Why don't skeletons fight each other? They don't have the guts. \n\nThe conversation involves sharing a light-hearted joke about skeletons."
+                  }
+                }
+              ]
+            }
+          }
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/utils/array_utils/sort-array:3.2.0
+      id: sort_array
+      env:
+        FIELD_PATH: ""
+        INPUT: ""
+        SORT_ORDER: ascending
+      uuid: 4918d972-530b-423f-96e5-a65b90557b61
+      pretty_name: Sort Array
+      options:
+        executor:
+          name: utils_infrastructure_v_1_41_0
+          env: {}
+          sync: true
+          disable: false
+      documentationUrl: https://learn.torq.io/docs/array-utilities#sort-array
+      manifestId: a29132ed-6207-53cb-bab6-389993a194dc
+      isPrivate: false
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/utils/array_utils/subtract-arrays:1.4.0
+      id: subtract_arrays
+      env:
+        LEFT_ARRAY: ""
+        RIGHT_ARRAY: ""
+      uuid: 7679530a-5a9a-4c2b-895d-0f0e409c0d5a
+      pretty_name: Subtract arrays
+      options:
+        executor:
+          name: utils_infrastructure_v_1_61_0
+          env: {}
+          sync: true
+          disable: false
+      documentationUrl: https://learn.torq.io/docs/array-utilities#subtract-arrays
+      manifestId: 6eeaa014-3440-5c17-bf5b-4d1724d5d835
+      isPrivate: false
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+  output_schema: '{}'
+  section: Customer
+root: true
