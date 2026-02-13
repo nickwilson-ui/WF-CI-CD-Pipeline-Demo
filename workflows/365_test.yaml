@@ -1,0 +1,122 @@
+!!ExportedWorkflow
+apiVersion: torq.io/v2alpha
+kind: Workflow
+id: e303d077-a147-4d81-ad90-f77406f2664d
+name: 365 test
+trigger:
+  onDemandTrigger:
+    parameterList:
+      parameters: []
+playbook:
+  steps:
+    - name: us-docker.pkg.dev/stackpulse/public/microsoft_365/generate-access-token:3.0.0
+      id: generate_access_token
+      env:
+        AUDIENCE: https://graph.microsoft.com/.default
+      envFrom:
+        integrationRef: nicks_365
+      uuid: e79fd2c3-9e2b-4868-a06e-352d242a76fe
+      pretty_name: Generate Access Token
+      options:
+        executor:
+          name: http_request_v_4_23_0
+          env: {}
+          sync: true
+          disable: false
+      manifestId: aa63eb94-7b29-50c6-b6c8-cbcb78e6c4f7
+      isPrivate: false
+      isPrivateUrl: true
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/microsoft_365/run-microsoft-graph-api-query:2.0.3
+      id: run_microsoft_graph_api_query
+      env:
+        MICROSOFT_ACCESS_TOKEN: '{{ $.generate_access_token.api_object.access_token }}'
+        REQUEST_URL: https://graph.microsoft.com/v1.0/users
+      uuid: ead7fe76-efe7-4b3c-bac9-07986782be75
+      pretty_name: Run Microsoft Graph API Query
+      options:
+        executor:
+          name: http_request_v_4_2_3
+          env:
+            AUTHORIZATION: Bearer
+            HEADERS: |-
+              {
+                  "ConsistencyLevel": "eventual"
+              }
+            METHOD: GET
+            PARSE_HJSON: "true"
+            REQUIRED_VARIABLES: '["REQUEST_URL", "MICROSOFT_ACCESS_TOKEN"]'
+            TIMEOUT: "30"
+            TOKEN: '{{ .MICROSOFT_ACCESS_TOKEN }}'
+            URL: '{{ .REQUEST_URL }}?{{ if or .FILTER_QUERY }}&$filter={{ .FILTER_QUERY | urlEnc }}{{ end }}{{ if or .SEARCH_STRING }}&$search="{{ .SEARCH_STRING | urlEnc }}"{{ end }}{{ if or .RETURN_FIELDS }}&$select={{ .RETURN_FIELDS | urlEnc }}{{ end }}{{ if or .SORT_ORDER .SORT_FIELD }}&$orderby={{ .SORT_FIELD | urlEnc }} {{ .SORT_ORDER | urlEnc }}{{ end }}{{ if or .LIMIT }}&$top={{ .LIMIT | urlEnc }}{{ end }}{{ if or .OFFSET }}&$skip={{ .OFFSET | urlEnc }}{{ end }}'
+          sync: true
+          disable: false
+      documentationUrl: https://docs.microsoft.com/en-us/graph/query-parameters
+      manifestId: cd902b85-af45-43bc-a479-9cf138c39c19
+      isPrivate: false
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/http/request:4.33.0
+      id: run_microsoft_graph_api_query_1
+      env:
+        AUTHORIZATION: Bearer
+        BODY: ""
+        HEADERS: |-
+          {
+              "ConsistencyLevel": "eventual"
+          }
+        METHOD: GET
+        TIMEOUT: "30"
+        TOKEN: '{{ $.generate_access_token.api_object.access_token }}'
+        URL: https://graph.microsoft.com/v1.0/security/threatIntelligence/
+      uuid: 15f20d59-e1b3-4fa5-a694-77d4f3b58239
+      pretty_name: Run Microsoft Graph API Query 1
+      options:
+        executor:
+          name: http_request_v_4_35_0
+          env: {}
+          sync: true
+          disable: false
+      icon: https://cdn.torq.io/vendors/microsoft_365.svg
+      documentationUrl: https://docs.microsoft.com/en-us/graph/query-parameters
+      manifestId: 7a86e1b9-edf7-5a09-a8be-149d431a01ee
+      isPrivate: false
+      isPrivateUrl: true
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/defender_endpoint/create-session:2.0.2
+      id: create_session
+      env:
+        DEFENDER_ENDPOINT_TENANT_ID: '{{ $.event.defender_endpoint_tenant_id }}'
+      envFrom:
+        integrationRef: '{{ $.event.microsoft_defender_for_endpoint_integration }}'
+      uuid: d1d7d345-41c1-4752-9a12-04bf17c7962b
+      pretty_name: Create Session
+      options:
+        executor:
+          name: http_request_v_4_2_4
+          env:
+            BODY: '[{"key": "grant_type", "type": "text", "value": "client_credentials"}, {"key": "client_id", "type": "text", "value": "{{ .DEFENDER_ENDPOINT_CLIENT_ID }}", "should_exists_var": "DEFENDER_ENDPOINT_CLIENT_ID"}, {"key": "scope", "type": "text", "value": "https://securitycenter.onmicrosoft.com/windowsatpservice/.default"}, {"key": "client_secret", "type": "text", "value": "{{ .DEFENDER_ENDPOINT_CLIENT_SECRET }}", "should_exists_var": "DEFENDER_ENDPOINT_CLIENT_SECRET"}]'
+            CONTENT_TYPE: application/x-www-form-urlencoded
+            HEADERS: '{}'
+            METHOD: POST
+            PARSE_HJSON: "true"
+            REQUIRED_VARIABLES: '["DEFENDER_ENDPOINT_CLIENT_ID", "DEFENDER_ENDPOINT_CLIENT_SECRET", "DEFENDER_ENDPOINT_TENANT_ID"]'
+            TIMEOUT: "120"
+            URL: https://login.microsoftonline.com/{{ .DEFENDER_ENDPOINT_TENANT_ID | urlEnc }}/oauth2/v2.0/token
+          sync: true
+          disable: false
+      manifestId: 240add06-ee45-4adb-92fd-77c8b5b94c0f
+      isPrivate: false
+      mock_output:
+        enabled: false
+      skip: false
+  output_schema: '{}'
+root: true
