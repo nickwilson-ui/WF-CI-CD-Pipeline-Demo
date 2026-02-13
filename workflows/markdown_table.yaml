@@ -1,0 +1,144 @@
+!!ExportedWorkflow
+apiVersion: torq.io/v2alpha
+kind: Workflow
+id: c4161d2f-513c-4b04-9221-6a4b2455c165
+name: Markdown table
+trigger:
+  onDemandTrigger:
+    parameterList:
+      parameters: []
+playbook:
+  steps:
+    - name: us-docker.pkg.dev/stackpulse/public/utils/output_utils/set-variable:2.3.0
+      id: set_variable
+      env:
+        DATA_TYPE: JSON
+        VALUE_JSON: |-
+          {
+            "length": 7,
+            "result": [
+              {
+                "resolution_reason": "VV-SOC: This is expected activity from a527781. Future cases related to this user accessing new assets should be considered false positive.",
+                "case_id": 5914,
+                "state": "CLOSED",
+                "key_note": "Yes"
+              },
+              {
+                "resolution_reason": "VV-SOC: This is a highly dangerous true positive and should be escalated to TIER 3.",
+                "case_id": 5912,
+                "state": "CLOSED",
+                "key_note": "Yes"
+              },
+              {
+                "case_id": "6152",
+                "key_note": "No",
+                "resolution_reason": "",
+                "state": "IN_PROGRESS"
+              },
+              {
+                "case_id": "6095",
+                "key_note": "No",
+                "resolution_reason": "",
+                "state": "IN_PROGRESS"
+              },
+              {
+                "case_id": "6032",
+                "key_note": "No",
+                "resolution_reason": "",
+                "state": "IN_PROGRESS"
+              },
+              {
+                "case_id": "6037",
+                "key_note": "No",
+                "resolution_reason": "",
+                "state": "IN_PROGRESS"
+              },
+              {
+                "case_id": "6107",
+                "key_note": "No",
+                "resolution_reason": "",
+                "state": "IN_PROGRESS"
+              }
+            ],
+            "step_status": {
+              "code": 1,
+              "message": "",
+              "verbose": ""
+            }
+          }
+        VARIABLE_NAME: json_value
+      uuid: 7252a57a-4a25-4256-9f8b-a53e5e4c0dad
+      pretty_name: Set Variable
+      options:
+        executor:
+          name: utils_infrastructure_v_1_41_0
+          env: {}
+          sync: true
+          disable: false
+      manifestId: 7b868a61-a5f1-53a3-ad5a-7c115d591b2e
+      isPrivate: false
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/utils/output_utils/tabulate_markdown:1.1.0
+      id: create_markdown_table
+      env:
+        INPUT: '{{ $.set_variable.json_value.result }}'
+      uuid: 067de700-505c-49eb-a33c-7757832adfb5
+      pretty_name: Create Markdown table
+      options:
+        executor:
+          name: utils_output_utils_tabulate_v_1_3_0
+          env:
+            MARKDOWN: "true"
+          sync: true
+          disable: false
+      manifestId: 5dbfc834-279e-5e4f-9cbc-55fb97f3c599
+      isPrivate: false
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/torq_cases/create-a-note:2.8.0
+      id: adds_a_new_note_to_a_case
+      env:
+        CASE_ID: "88"
+        CONTENT: '{{ $.create_markdown_table.tabulate_output }}'
+        TITLE: Note
+      uuid: 68cced5d-7a1d-478b-b0e7-dc7bc46200a9
+      pretty_name: Adds a new note to a case
+      options:
+        executor:
+          name: torq_cases_create-a-note_v_2_8_0
+          env: {}
+          sync: true
+          disable: false
+      manifestId: cfba0bd4-eafa-5767-9512-1c40fdfbc035
+      isPrivate: false
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/torq_cases/add-comment-to-case:4.6.0
+      id: add_comment_to_case
+      env:
+        CASE_ID: "88"
+        TEXT_COMMENT: '{{ $.create_markdown_table.tabulate_output }}'
+      uuid: 0ce76464-8c34-437d-93b0-8c32359bb414
+      pretty_name: Add comment to case
+      options:
+        executor:
+          name: torq_cases_add-comment-to-case_v_4_6_0
+          env: {}
+          sync: true
+          disable: false
+      manifestId: 9f80ddf0-aeaf-5130-8cb6-3859fe55ef2f
+      isPrivate: false
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+  output_schema: '{}'
+  section: Nick's Demo Examples
+root: true
