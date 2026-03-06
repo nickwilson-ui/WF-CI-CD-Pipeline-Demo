@@ -1,0 +1,266 @@
+!!ExportedWorkflow
+apiVersion: torq.io/v2alpha
+kind: Workflow
+id: 1db354fc-2333-4f84-81c9-e1b7834ad636
+name: Initial SentinelOne Case Creation
+trigger:
+  integrationTrigger:
+    integration:
+      name: ""
+      typeId: sentinelone_monitoring
+    conditions:
+      or:
+        and: []
+playbook:
+  steps:
+    - name: us-docker.pkg.dev/stackpulse/public/jq/infra:3.23.0
+      id: mitre_techniques_with_join
+      env:
+        __TQ_FILE_ENV_PARSER__INPUT: plain-text
+        INPUT: '{{ $.event.indicators }}'
+        JSON_QUERY: '[.[] | .tactics[] | select(.source == "MITRE") | .techniques[].name] | map(select(. != null)) | join(",")'
+      uuid: 58026135-815e-4801-ab37-2fdc5e6b5e1c
+      pretty_name: Mitre Techniques with Join
+      options:
+        executor:
+          name: utils_infrastructure_v_1_47_0
+          env: {}
+          sync: true
+          disable: false
+      documentationUrl: https://stedolan.github.io/jq/manual/#Basicfilters
+      manifestId: 5c22236e-628e-56ae-b7c3-bdb764d09a50
+      isPrivate: false
+      isPrivateUrl: true
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/utils/output_utils/set-variable:2.3.0
+      id: sentinelone_threat_field_mapping_and_markdown_tables
+      env:
+        DATA_TYPE: JSON
+        VALUE_JSON: |-
+          {
+            "case_markdown_tables": [
+              {
+                "name": "Event Details",
+                "markdown_header_color": "red",
+                "fields": [
+                  "Threat Name",
+                  "Confidence",
+                  "Site Name",
+                  "SHA1",
+                  "Mitre",
+                  "Created Timestamp",
+                  "File Path",
+                  "Mitigation Status"
+                ]
+              },
+              {
+                "name": "Host Information",
+                "markdown_header_color": "blue",
+                "fields": [
+                  "Hostname",
+                  "Sensor ID",
+                  "Agent UUID",
+                  "Agent Version",
+                  "Process User Name",
+                  "Local IP",
+                  "MAC Address",
+                  "Host Type",
+                  "Platform",
+                  "OS Version"
+                ]
+              }
+            ],
+            "case_fields": [
+              {
+                "key": "case_event_source",
+                "value": "SentinelOne",
+                "tag": true
+              },
+              {
+                "key": "case_header",
+                "value": "SentinelOne Threat Finding"
+              },
+              {
+                "key": "case_logo_url",
+                "value": "https://storage.googleapis.com/stackpulse-public/vendors/sentinelone.svg"
+              },
+              {
+                "key": "case_category",
+                "value": "Endpoint Security"
+              },
+              {
+                "key": "case_title",
+                "value": "{{ $.event.threatInfo.classification }} found on {{ $.event.agentRealtimeInfo.agentComputerName }} by process user {{ jsonEscape $.event.threatInfo.processUser }}"
+              },
+              {
+                "key": "case_description",
+                "value": "{{ $.event.threatInfo.classification }} found on {{ $.event.agentRealtimeInfo.agentComputerName }}"
+              },
+              {
+                "key": "case_metadata_alert_id",
+                "value": "{{ $.metadata.alert_id }}"
+              },
+              {
+                "key": "Agent ID",
+                "value": "{{ $.event.agentRealtimeInfo.agentId }}",
+                "custom_field": true,
+                "type": "short_text"
+              },
+              {
+                "key": "Event ID",
+                "value": "{{ $.event.id }}",
+                "custom_field": true,
+                "type": "short_text"
+              },
+              {
+                "key": "SHA1",
+                "value": "{{ $.event.threatInfo.sha1 }}",
+                "observable_type": "file_hash",
+                "observable_sub_type": "sha1"
+              },
+              {
+                "key": "File Path",
+                "value": "{{ jsonEscape $.event.threatInfo.filePath }}",
+                "observable_type": "filename"
+              },
+              {
+                "key": "Confidence",
+                "value": "{{ $.event.threatInfo.confidenceLevel }}"
+              },
+              {
+                "key": "Hostname",
+                "value": "{{ $.event.agentRealtimeInfo.agentComputerName }}",
+                "custom_field": true
+              },
+              {
+                "key": "Created Timestamp",
+                "value": "{{ $.event.threatInfo.createdAt }}"
+              },
+              {
+                "key": "Agent Version",
+                "value": "{{ $.event.agentRealtimeInfo.agentVersion }}",
+                "custom_field": true
+              },
+              {
+                "key": "Agent UUID",
+                "value": "{{ $.event.agentRealtimeInfo.agentUuid }}",
+                "custom_field": true
+              },
+              {
+                "key": "Sensor ID",
+                "value": "{{ $.event.agentRealtimeInfo.agentId }}",
+                "custom_field": true
+              },
+              {
+                "key": "MAC Address",
+                "value": "{{ $.event.agentRealtimeInfo.networkInterfaces.0.physical }}",
+                "observable_type": "mac_address",
+                "custom_field": true
+              },
+              {
+                "key": "Platform",
+                "value": "{{ $.event.agentRealtimeInfo.agentOsType }}"
+              },
+              {
+                "key": "OS Version",
+                "value": "{{ $.event.agentRealtimeInfo.agentOsRevision }}",
+                "custom_field": true,
+                "type": "short_text"
+              },
+              {
+                "key": "Mitigation Status",
+                "value": "{{ $.event.threatInfo.mitigationStatusDescription }}"
+              },
+              {
+                "key": "User Name",
+                "value": "{{ $.event.agentDetectionInfo.agentLastLoggedInUserName }}",
+                "observable_type": "user_name",
+                "custom_field": true
+              },
+              {
+                "key": "Process User Name",
+                "value": "{{ jsonEscape $.event.threatInfo.processUser }}",
+                "observable_type": "user_name",
+                "custom_field": true
+              },
+              {
+                "key": "Mitre",
+                "value": "{{ $.mitre_techniques_with_join.output }}",
+                "tag": true
+              },
+              {
+                "key": "Threat Name",
+                "value": "{{ $.event.threatInfo.threatName }}",
+                "custom_field": true
+              },
+              {
+                "key": "Site Name",
+                "value": "{{ $.event.agentRealtimeInfo.siteName }}",
+                "custom_field": true
+              },
+              {
+                "key": "Host Type",
+                "value": "{{ $.event.agentRealtimeInfo.agentMachineType }}"
+              },
+              {
+                "key": "Local IP",
+                "value": "{{ $.event.agentRealtimeInfo.networkInterfaces.0.inet.0 }}",
+                "observable_type": "ip_address"
+              }
+            ]
+          }
+        VARIABLE_NAME: json
+      uuid: 3506705c-23d7-4e7e-8b8e-02d5ff970c69
+      pretty_name: SentinelOne Threat Field Mapping and Markdown Tables
+      options:
+        executor:
+          name: utils_infrastructure_v_1_41_0
+          env: {}
+          sync: true
+          disable: false
+      manifestId: 7b868a61-a5f1-53a3-ad5a-7c115d591b2e
+      isPrivate: false
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - trigger:
+        id: create_a_torq_case_from_a_field_mapping_json
+        playbook_id: bb8920b1-46ee-4c86-bcd5-b1c12c062454
+        pretty_name: Create a Torq Case from a Field Mapping JSON
+        uuid: 756dc5b7-ba49-4b63-bf93-7f10bfe25186
+        input: |-
+          {
+            "field_mapping_json": {{ $.sentinelone_threat_field_mapping_and_markdown_tables.json }},
+            "extended_output": "true"
+          }
+        playbook_name: Create a Torq Case from a Field Mapping JSON V0.5
+        mock_output:
+          enabled: false
+          payload: '{}'
+    - exit:
+        success: "true"
+        pretty_name: Exit
+        output: '{}'
+        uuid: 087da64b-e0fd-4f3e-811d-41bad00e0dd1
+  annotations:
+    - uuid: 9c946539-b28a-4796-be64-b47cb2bfa9ea
+      x: -675
+      "y": 118
+      width: 624
+      height: 252
+      content: '{"type":"doc","content":[{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"Initial SentinelOne Case Creation "}]},{"type":"paragraph"},{"type":"paragraph","content":[{"type":"text","text":"This workflow is used as an example of receiving a threat event from SentinelOne a Singularity Webhook to create a case with Torq using the field mapping nested workflow."}]},{"type":"paragraph","content":[{"type":"text","text":"The variable step defines the fields and markdown tables to be used with the nested workflow.  The nested workflow will take the details and generate a case with custom fields, observables, and tags."}]},{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"V0.5"},{"type":"hardBreak"},{"type":"text","text":"                                              "},{"type":"image","attrs":{"src":"https://cdn.torq.io/vendors/sentinelone.svg","alt":null,"title":null,"width":167,"height":168,"isDraggable":true,"isResizable":null}}]}]}'
+    - uuid: 84666477-b12f-4200-9f46-9a75cbd76cf5
+      x: 289
+      "y": 370
+      attachedStepId: 3506705c-23d7-4e7e-8b8e-02d5ff970c69
+      attachedDistance:
+        x: -289
+        "y": -108
+      content: '{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"The SentinelOne Field Mapping JSON"}]}]}'
+  output_schema: '{}'
+  section: Case Creation from Field Mapping Workflows
+root: true
