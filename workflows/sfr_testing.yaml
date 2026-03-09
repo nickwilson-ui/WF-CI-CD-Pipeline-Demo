@@ -1,0 +1,38 @@
+!!ExportedWorkflow
+apiVersion: torq.io/v2alpha
+kind: Workflow
+id: daa3e2b8-95a8-49c0-8e33-c7b9dcd11fb6
+name: SfR Testing
+trigger:
+  onDemandTrigger:
+    parameterList:
+      parameters: []
+    nestedOnly: true
+playbook:
+  steps:
+    - name: us-docker.pkg.dev/stackpulse/public/utils/output_utils/print:2.2.0
+      id: print_a_message_to_stdout
+      env:
+        __TQ_FILE_ENV_PARSER__FILE_OR_STRING: plain-text
+        FILE_OR_STRING: Hello, this is a string.
+      uuid: 4028db05-99c0-4afe-beec-073f585802f5
+      pretty_name: Print a message to stdout
+      options:
+        executor:
+          name: utils_infrastructure_v_1_41_0
+          env: {}
+          sync: true
+          disable: false
+      manifestId: e43d76f2-4382-5e23-a993-f15651735991
+      isPrivate: false
+      isPrivateUrl: true
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+  output_schema: '{}'
+  tags:
+    - workflow
+    - cases
+  section: LEGO
+root: true
