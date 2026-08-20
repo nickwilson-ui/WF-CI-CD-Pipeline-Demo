@@ -1,0 +1,151 @@
+!!ExportedWorkflow
+apiVersion: torq.io/v2alpha
+kind: Workflow
+id: 2162abc4-d2ca-4163-91c8-4a8ef15e976d
+name: akzo-weekly-vuln-digest
+trigger:
+  onDemandTrigger:
+    parameterList:
+      parameters: []
+playbook:
+  steps:
+    - name: us-docker.pkg.dev/stackpulse/public/utils/parameters_utils/workflow_parameters:1.3.0
+      id: params
+      env:
+        SCHEMA: '{"sender_upn": {"type": 8, "prettyName": "Sender UPN", "description": "The UPN / email address of the mailbox sending the digest (e.g. soc@akzonobel.com)", "uiPlaceholder": "", "required": true}, "security_team_email": {"type": 8, "prettyName": "Security Team Email", "description": "Recipient email address for the vulnerability digest", "uiPlaceholder": "", "required": true}, "nvd_api_base_url": {"type": 8, "prettyName": "NVD API Base URL", "description": "NIST NVD REST API base URL for fetching recent CVEs", "uiPlaceholder": "", "required": true}}'
+        VALUES: '{"sender_upn": "soc@akzonobel.com", "security_team_email": "recipient@example.com", "nvd_api_base_url": "https://services.nvd.nist.gov/rest/json/cves/2.0"}'
+      uuid: f831ac7b-8f5c-4c20-9b40-e09296673582
+      pretty_name: params
+      options:
+        executor:
+          name: utils_workflow_parameters_v_1_3_0
+          env: {}
+          sync: true
+          disable: false
+      isPrivate: false
+      isPrivateUrl: true
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/http/request:4.36.0
+      id: fetch_critical_cves
+      env:
+        AUTHORIZATION: None
+        HEADERS: '{"Accept": "application/json"}'
+        METHOD: GET
+        URL: '{{ $.params.nvd_api_base_url }}?cvssV3Severity=CRITICAL&resultsPerPage=10&startIndex=0'
+      uuid: 0954d849-76f5-4f02-b6c9-5368b1b8c471
+      pretty_name: Fetch Critical Cves
+      options:
+        executor:
+          name: http_request_v_4_42_0
+          env: {}
+          sync: true
+          disable: false
+      manifestId: 0a790357-24ca-59c7-b730-16892d225adf
+      isPrivate: false
+      isPrivateUrl: true
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/microsoft_365/generate-access-token:3.3.0
+      id: get_access_token
+      env:
+        AUDIENCE: https://graph.microsoft.com/.default
+      envFrom:
+        integrationRef: nicks_365
+      uuid: e3c7409a-655b-4903-abaa-80d9c4b78414
+      pretty_name: Get Access Token
+      options:
+        executor:
+          name: http_request_v_4_34_0
+          env: {}
+          sync: true
+          disable: false
+      manifestId: df08cdcd-7d67-527c-812e-5c7cf58550bb
+      isPrivate: false
+      isPrivateUrl: true
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/microsoft_outlook/send-message:8.9.0
+      id: send_vuln_digest_email
+      env:
+        MESSAGE_CONTENT: '<p>This is your weekly critical vulnerability digest from the Torq Security Automation platform.</p><p>The following critical CVEs (CVSS >= 9.0) were published recently:</p><pre>{{ $.fetch_critical_cves.api_object.vulnerabilities }}</pre><p>Total results: {{ $.fetch_critical_cves.api_object.totalResults }}</p><p>Please review and prioritise patching accordingly. Contact the security team with any questions.</p>'
+        MESSAGE_CONTENT_TYPE: HTML
+        MICROSOFT_ACCESS_TOKEN: '{{ $.get_access_token.api_object.access_token }}'
+        RECIPIENTS: '{{ $.params.security_team_email }}'
+        SUBJECT: '[Akzo Nobel Security] Weekly Critical Vulnerability Digest'
+        USER_ID_OR_EMAIL: '{{ $.params.sender_upn }}'
+      uuid: a82aaca0-91a4-4aca-8162-88da2271066d
+      pretty_name: Send Vuln Digest Email
+      options:
+        executor:
+          name: http_request_v_4_34_0
+          env: {}
+          sync: true
+          disable: false
+      manifestId: c7a009a8-b2dc-58ac-b1bd-838ab0c1a62d
+      isPrivate: false
+      isPrivateUrl: true
+      mock_output:
+        enabled: false
+      skip: true
+      retry: {}
+    - name: us-docker.pkg.dev/stackpulse/public/http/request:4.36.0
+      id: send_vuln_digest_with_sensitivity_label
+      env:
+        AUTHORIZATION: None
+        BODY: '{"message": {"subject": "[Akzo Nobel Security] Weekly Critical Vulnerability Digest", "body": {"contentType": "HTML", "content": "<p>This is your weekly critical vulnerability digest from the Torq Security Automation platform.</p><p>The following critical CVEs (CVSS >= 9.0) were published recently:</p><pre>{{ $.fetch_critical_cves.api_object.vulnerabilities | jsonEscape }}</pre><p>Total results: {{ $.fetch_critical_cves.api_object.totalResults }}</p><p>Please review and prioritise patching accordingly. Contact the security team with any questions.</p>"}, "toRecipients": [{"emailAddress": {"address": "{{ $.params.security_team_email | jsonEscape }}"}}], "internetMessageHeaders": [{"name": "x-torq-sensitivity-label", "value": "confidential"}]}, "saveToSentItems": true}'
+        CONTENT_TYPE: application/json
+        HEADERS: '{"Authorization": "Bearer {{ $.get_access_token.api_object.access_token }}", "Content-Type": "application/json"}'
+        METHOD: POST
+        URL: https://graph.microsoft.com/v1.0/users/{{ $.params.sender_upn | urlEnc }}/sendMail
+      pretty_name: Send Vuln Digest With Sensitivity Label
+      options:
+        executor:
+          name: http_request_v_4_42_0
+          env: {}
+          sync: true
+          disable: false
+      isPrivate: false
+      isPrivateUrl: true
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+    - exit:
+        success: "true"
+        pretty_name: Return vuln digest result
+        output: |-
+          {
+            "cve_count": "{{ $.fetch_critical_cves.api_object.totalResults }}",
+            "recipient": "{{ $.params.security_team_email }}"
+          }
+        uuid: 0e0a18e7-94c3-4cb9-a342-8f9a4de17dd0
+        use_schema: true
+  annotations:
+    - uuid: c9a3db3d-1bda-4cda-9f1a-582692199e9c
+      x: 380
+      "y": 120
+      content: '{"type": "doc", "content": [{"type": "heading", "attrs": {"level": 3}, "content": [{"type": "text", "text": "Weekly Vulnerability Digest"}]}, {"type": "paragraph", "content": [{"type": "text", "text": "1. Fetch the latest critical CVEs (CVSS score >= 9.0) from the NIST NVD API"}]}, {"type": "paragraph", "content": [{"type": "text", "text": "2. Generate Microsoft 365 access token"}]}, {"type": "paragraph", "content": [{"type": "text", "text": "3. Email the security team a digest of the top critical vulnerabilities"}]}, {"type": "paragraph"}, {"type": "paragraph", "content": [{"type": "text", "text": "--- DEMO NOTE ---"}]}, {"type": "paragraph", "content": [{"type": "text", "text": "Disable the ''send_vuln_digest_email'' step and add an HTTP step below it."}]}, {"type": "paragraph", "content": [{"type": "text", "text": "Use POST https://graph.microsoft.com/v1.0/users/<sender-UPN>/sendMail"}]}, {"type": "paragraph", "content": [{"type": "text", "text": "with internetMessageHeaders: [{\"name\": \"x-torq-sensitivity-label\", \"value\": \"confidential\"}]"}]}, {"type": "paragraph", "content": [{"type": "text", "text": "This applies a Purview sensitivity label until the native step supports the param."}]}]}'
+  output_schema: |-
+    {
+        "cve_count": {
+            "type": 8,
+            "prettyName": "cve_count",
+            "description": "Number of critical CVEs fetched from NVD"
+        },
+        "recipient": {
+            "type": 8,
+            "prettyName": "recipient",
+            "description": "Email address the digest was sent to"
+        }
+    }
+  tags:
+    - ak-ab-demo
+  section: Akzo Nobel
+root: true
