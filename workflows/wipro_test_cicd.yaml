@@ -1,0 +1,61 @@
+!!ExportedWorkflow
+apiVersion: torq.io/v2alpha
+kind: Workflow
+id: ce252259-d168-47d8-b3ed-8224c5d8d48d
+name: Wipro Test CICD
+trigger:
+  onDemandTrigger:
+    parameterList:
+      parameters: []
+playbook:
+  steps:
+    - parallel:
+        uuid: e0d01344-00fc-4ae1-bc70-52fead966e7c
+        pretty_name: Parallel Executions
+        threads:
+          - uuid: 8cda66a0-d4e7-41ba-9c70-6fd7bbb97e1a
+            steps:
+              - name: us-docker.pkg.dev/stackpulse/public/utils/output_utils/print:2.8.0
+                id: print_a_message_to_stdout
+                env:
+                  __TQ_FILE_ENV_PARSER__FILE_OR_STRING: plain-text
+                  FILE_OR_STRING: Hello, this is a string.
+                uuid: f437414b-4b53-4d2e-9dfe-e1068a0ec5e4
+                pretty_name: Print a message to stdout
+                options:
+                  executor:
+                    name: utils_infrastructure_v_1_72_0
+                    env: {}
+                    sync: true
+                    disable: false
+                manifestId: d42cab37-acff-8094-9e36-52285f636094
+                isPrivate: false
+                isPrivateUrl: true
+                mock_output:
+                  enabled: false
+                skip: false
+                retry: {}
+          - uuid: eeedc872-7cda-4302-abb1-852257b49b63
+            steps:
+              - name: us-docker.pkg.dev/stackpulse/public/utils/output_utils/print:2.8.0
+                id: print_a_message_to_stdout
+                env:
+                  __TQ_FILE_ENV_PARSER__FILE_OR_STRING: plain-text
+                  FILE_OR_STRING: Goodbye, this is a string.
+                uuid: 7acdcb2b-c926-416f-923a-612b60cb4ccf
+                pretty_name: 'Print a message to stdout '
+                options:
+                  executor:
+                    name: utils_infrastructure_v_1_72_0
+                    env: {}
+                    sync: true
+                    disable: false
+                manifestId: d42cab37-acff-8094-9e36-52285f636094
+                isPrivate: false
+                isPrivateUrl: true
+                mock_output:
+                  enabled: false
+                skip: false
+                retry: {}
+  output_schema: '{}'
+root: true
