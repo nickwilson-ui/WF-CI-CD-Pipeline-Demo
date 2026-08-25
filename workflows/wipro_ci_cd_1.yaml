@@ -1,0 +1,35 @@
+!!ExportedWorkflow
+apiVersion: torq.io/v2alpha
+kind: Workflow
+id: a93a51f7-4c72-4154-a4fb-0f050c3208f1
+name: Wipro CI CD 1
+trigger:
+  onDemandTrigger:
+    parameterList:
+      parameters: []
+playbook:
+  steps:
+    - name: us-docker.pkg.dev/stackpulse/public/utils/output_utils/print:2.8.0
+      id: print_a_message_to_stdout
+      env:
+        __TQ_FILE_ENV_PARSER__FILE_OR_STRING: plain-text
+        FILE_OR_STRING: '{{ $.metadata.workflow_id }}'
+      uuid: d2bbac4d-b9dd-4217-89a6-451ea584dcb1
+      pretty_name: Print a message to stdout
+      options:
+        executor:
+          name: utils_infrastructure_v_1_72_0
+          env: {}
+          sync: true
+          disable: false
+      manifestId: d42cab37-acff-8094-9e36-52285f636094
+      isPrivate: false
+      isPrivateUrl: true
+      mock_output:
+        enabled: false
+      skip: false
+      retry: {}
+  output_schema: '{}'
+  tags:
+    - wipro
+root: true
